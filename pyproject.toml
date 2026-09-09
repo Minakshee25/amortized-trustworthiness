@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "amortized-trustworthiness"
+version = "1.0.0"
+description = "Training small language models as real-time uncertainty proxies for large language models"
+requires-python = ">=3.9"
+
+[tool.setuptools]
+packages = [
+    "amortized_ue",
+    "amortized_ue.stage1",
+    "amortized_ue.stage2",
+    "amortized_ue.baselines",
+    "amortized_ue.alignment",
+    "amortized_ue.eval",
+    "experiments",
+]

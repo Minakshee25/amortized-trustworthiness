@@ -435,7 +435,7 @@ def _parse() -> tuple[Stage2Config, str]:
                         "arms q_only / q_resp_only drop z entirely (no target-LLM forward pass) "
                         "-- e.g. 'z,z_q,z_q_resp,q_only,q_resp_only' for the full 5-arm set.")
     # --- regularisation knobs (the proxy is UNDER-regularised: train 0.891 / test 0.590,
-    #     vs optimal ridge's 0.856 / 0.642 -- it memorises harder and generalises worse) ---
+    # vs optimal ridge's 0.856 / 0.642 -- it memorises harder and generalises worse) ---
     p.add_argument("--weight_decay", type=float, default=Stage2Config.weight_decay,
                    help="AdamW weight decay (default 0.01). The analogue of ridge's alpha, which "
                         "is selected at ~1e4 on this data — so 0.01 is very weak. Try 0.1 / 1.0.")

@@ -2021,7 +2021,7 @@
     "wh_4269--173/173_235742.txt#0_0",
     "wh_4338--177/177_827721.txt#0_1"
   ],
-  "data_dir": "/data2/mn1025/stage1",
+  "data_dir": "NFS-default",
   "incorrect_threshold": 0.5,
   "sep_recipe": "correctness_eval.sep_single_fixed_layer (LogisticRegression, train-side best_split)",
   "ridge_recipe": "linear_ceiling_probe.fit_probe (alpha on val Spearman)",

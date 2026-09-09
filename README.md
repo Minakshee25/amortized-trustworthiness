@@ -1,134 +1,142 @@
-# Semantic Entropy Probes: Robust and Cheap Hallucination Detection in LLMs
+# Amortized Trustworthiness
 
-Jannik Kossen*, Jiatong Han*, Muhammed Razzak*, Lisa Schut, Shreshth Malik, Yarin Gal
+Training small language models as real-time uncertainty proxies for large language models.
 
-| **[Abstract](#Abstract)**
-| **[Citation](#Citation)**
-| **[Requirements](#Requirements)**
-| **[Installation](#Installation)**
-| **[Tutorial](#Tutorial)**
-| **[Codebase](#Codebase)**
+MSc Individual Project, Department of Computing, Imperial College London.
 
-[![arXiv](https://img.shields.io/badge/arXiv-2406.15927-b31b1b.svg)](https://arxiv.org/abs/2406.15927)
-[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.1-red.svg)](https://pytorch.org/get-started/locally/)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://GitHub.com/Naereen/StrapDown.js/graphs/commit-activity)
+## Overview
 
-## Abstract
-We propose semantic entropy probes (SEPs), a cheap and reliable method for uncertainty quantification in Large Language Models (LLMs). Hallucinations, which are plausible-sounding but factually incorrect and arbitrary model generations, present a major challenge to the practical adoption of LLMs. Recent work by [Farquhar et al. (2024)](https://www.nature.com/articles/s41586-024-07421-0) proposes semantic entropy (SE), which can detect hallucinations by estimating uncertainty in the space semantic meaning for a set of model generations. However, the 5-to-10-fold increase in computation cost associated with SE computation hinders practical adoption. To address this, we propose SEPs, which directly approximate SE from the hidden states of a single generation. SEPs are simple to train and do not require sampling multiple model generations at test time, reducing the overhead of semantic uncertainty quantification to almost zero. We show that SEPs retain high performance for hallucination detection and generalize better to out-of-distribution data than previous probing methods that directly predict model accuracy. Our results across models and tasks suggest that model hidden states capture SE, and our ablation studies give further insights into the token positions and model layers for which this is the case.
+Sampling-based uncertainty estimators such as semantic entropy detect confabulation well but
+cost several generations plus a clustering pass per query, which is too slow for
+latency-constrained deployment. This project asks whether that computation can be *amortised*:
+run it once, offline, over many prompts and target LLMs, and distil the resulting signal into a
+small language model (SLM) that predicts it in a single forward pass.
 
-## Citation
+The proxy is trained on a three-input tuple `(x, y*, z)` — the prompt, the greedy answer, and a
+decoder hidden state from the target LLM projected into a shared space — and regresses the target
+LLM's semantic entropy. Because the text inputs are model-agnostic, the same proxy can in
+principle be pointed at a target LLM it was never trained on.
+
+### Research questions
+
+- **RQ1 — Amortised inference efficiency.** Can an SLM proxy predict a large target LLM's
+  multi-sample semantic entropy in one forward pass, and what latency reduction does that give
+  over sampling?
+- **RQ2 — Supervision signal.** Which ground-truth uncertainty metric is the most stable and
+  distillable training target?
+- **RQ3 — Input modality and access.** Does the proxy need the target LLM's hidden state
+  (grey-box), or does it transfer from prompt and response text alone (black-box)? Does it
+  generalise across model families and knowledge domains?
+
+### Headline results
+
+| | finding | experiments |
+|---|---|---|
+| RQ1 | one proxy forward pass is ~90–100x faster per question than 10-sample semantic entropy with DeBERTa clustering; ~14–16x end to end | E61 |
+| RQ2 | the semantic clustering carries the signal; binarising the entropy label costs ~0.07 AUROC; the entropy weighting itself adds little over a raw cluster count | E56, E58 |
+| RQ3 | raw hidden states do **not** transfer across LLMs; an orthogonal-Procrustes alignment recovers most of the signal; a text-only proxy (`q_resp_only`) transfers directly and, with no target labels and no sampling, is on par with 10-sample semantic entropy in-distribution and beats a supervised hidden-state probe (SEP) out-of-distribution | E20–E42, E45–E73 |
+
+The full chronological account, including retracted and superseded results, is in
+[`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md). A per-experiment index is in
+[`docs/experiment_index.md`](docs/experiment_index.md).
+
+## Repository layout
+
 ```
-@misc{kossen2024semanticentropyprobesrobust,
-      title={Semantic Entropy Probes: Robust and Cheap Hallucination Detection in LLMs}, 
-      author={Jannik Kossen and Jiatong Han and Muhammed Razzak and Lisa Schut and Shreshth Malik and Yarin Gal},
-      year={2024},
-      eprint={2406.15927},
-      archivePrefix={arXiv},
-      primaryClass={cs.CL},
-      url={https://arxiv.org/abs/2406.15927}, 
-}
+amortized_ue/            installable package
+  config.py                Stage-1 configuration dataclass
+  paths.py                 canonical filesystem locations
+  stage1/                  offline construction of the semantic-entropy dataset
+    build.py                 CLI: python -m amortized_ue.stage1.build
+    records.py, loaders.py, sep_bridge.py, wandb_io.py
+  stage2/                  the SLM proxy
+    model.py                 architecture: projector + frozen backbone + LoRA + regression head
+    train.py                 training loop, (position, layer, k) selection
+    run.py                   CLI: python -m amortized_ue.stage2.run
+    data.py, config.py, checkpoint.py
+  baselines/              ridge probes, SEP bridge, label-noise and linear ceilings
+  alignment/             cross-model representational alignment (orthogonal Procrustes)
+  eval/                  shared evaluation engines (correctness, SE-fidelity, latency, fusion)
+
+experiments/            one runnable script per experiment, grouped by research question
+  rq1_efficiency/  rq2_supervision/  rq3_modality/
+  cross_llm_transfer/  lolo_thesis/  big_tier/  qwen_gemma/  model_specificity/
+  archive/               retracted / superseded experiments, kept for the record
+
+semantic_uncertainty/    semantic-entropy generation pipeline, adapted from jlko/semantic_uncertainty
+semantic_entropy_probes/ SEP probe training (baseline)
+results/                 result JSON/CSV for every experiment + fitted baseline objects
+docs/                    EXPERIMENTS.md, experiment_index.md, methodology.md, development.md
+environment/             pinned dependency lists for the two environments
 ```
-
-## Requirements
-
-### Hardware Dependencies
-
-To obtain the hidden states of the large language model, you are required to do forward passes through the model on the relevant prompts/answers. Our code makes use of GPUs doing inference at FP16.
-
-Common memory requirements per model size:
-- 7B models: ~24 GB
-- 13B models: ~48GB
-- 70B model: ~160GB
-
-
-### Software Dependencies
-
-Dependecies for this code include Python 3.11 and PyTorch 2.1.
-
-In `environment_export.yaml`, we list the precise versions for all Python packages.
 
 ## Installation
 
+Two Python 3.10 environments are used; exact pins are in [`environment/`](environment/).
 
-To install Python with all necessary dependencies, we recommend you use conda.
+```bash
+# generation + analysis (semantic-entropy pipeline, ridge diagnostics)
+python -m venv .venv-gen && . .venv-gen/bin/activate
+pip install -r environment/generation.txt
+pip install -e .
 
-We refer to [https://conda.io/](https://conda.io/) for an installation guide.
-
-After installing conda, you can set up and activate the conda environment by executing the following commands at the root folder of this repository:
-
-```
-conda-env update -f sep_enviroment.yaml
-conda activate se_probes
-```
-
-
-Our experiments rely on [Weights & Biases](https://wandb.ai/) to log results. You may need to log in with your wandb API key upon initial execution.
-
-Our experiments rely on HuggingFace for all LLM models and most of the datasets. Set the environment variable `HUGGING_FACE_HUB_TOKEN` to the token associated with your Hugging Face account. For Llama models, [apply for access](https://huggingface.co/meta-llama) to use the official repository of Meta's LLaMa-2 models.
-
-
-Our experiments with sentence-length generation use GPT models from the OpenAI API.
-Please set the environment variable `OPENAI_API_KEY` to your OpenAI API key in order to use these models.
-Costs for reproducing our results vary depending on experiment configuration, but, without any guarantee, should lie somewhere between 10 and 100 USD.
-
-
-For almost all tasks, the dataset is downloaded automatically from HuggingFace Datasets library upon first execution.
-Only for bioasq, data needs to be [downloaded](http://participants-area.bioasq.org/datasets) manually.
-
-
-## Tutorial
-
-### Generate Semantic Entropy Probes Dataset
-
-Execute
-
-```
-python generate_answers.py --model_name=Llama-2-7b-chat --dataset=trivia_qa
+# proxy training (separate env: newer transformers + peft for the 3B backbone)
+python -m venv .venv-proxy && . .venv-proxy/bin/activate
+pip install -r environment/proxy.txt
+pip install -e .
 ```
 
-to reproduce results for short-phrase generation with LLaMa-2 Chat (7B) on the TriviaQA dataset.
+Required environment variables: `HUGGING_FACE_HUB_TOKEN`, `WANDB_ENT` (or run offline),
+`OPENAI_API_KEY` (a placeholder is fine unless using GPT entailment). Set `AMORTIZED_UE_DATA`
+to the Stage-1 dataset directory if it is not `./data/stage1`. See
+[`docs/development.md`](docs/development.md) for machine-specific notes.
 
-The expected runtime of this demo is 1 hour using an A100 GPU, 24 cores of a Intel(R) Xeon(R) Gold 6248R CPU @ 3.00GHz, and 192 GB of RAM.
-Runtime may be longer upon first execution, as models need to be downloaded first.
+## Pipeline
 
-Note down the wandb id assigned to your demo run.
+**Stage 1 — build the offline semantic-entropy dataset** (generation env):
 
-To obtain a barplot similar to those of the paper, open the the iPython notebook in `semantic_entropy_probes/train-latent-probe.ipynb`, populate `wandb_id` with the id of your demo run, and execute all cells.
-
-### Training Semantic Entropy Probes
-
-We retrieve saved model hidden states on two token positions (TBG, SLT) with which we train linear probes to predict model semantic uncertainty and further predict correctness.
-
-See [this notebook](./semantic_entropy_probes/latent-probe.ipynb) for step-by-step guide on training SEPs, which also contains handy tools for data loading, visualizations, and computing baselines. 
-
-## Codebase
-### Repository Structure
-
-* Code to generate the semantic entropy is contained in the semantic uncertainty folder, and adapted from the repo for [semantic uncertainty](https://github.com/jlko/semantic_uncertainty). With in this, a standard SE generation run executes the following three scripts in order:
-
-    1. `generate_answers.py`: Sample responses (and their likelihods/hidden states) from the models for the questions.
-    2. `compute_uncertainties.py`: Compute uncertainty metrics given responses.
-    3. `analyze_results.py`: Compute aggregate performance metrics.
-* Once this is calculated, you can use the train_latent-probe.ipynb notebook, contained in the semantic_entropy_probes folder to train your SEPs.
-
-### Reproducing the Experiments
-
-To reproduce the experiments of the paper, one just needs to run the above demo for the various combinations of models and datasets.
-
-The simplest way is to execute `slurm/run.sh` (with commands to generate both short-form and long-form answers to all datasets) if you are using `slurm`. 
-
-Or you may directly execute iteratively
-
-```
-python generate_answers.py --model_name=$MODEL --dataset=$DATASET $EXTRA_CFG
+```bash
+python -m amortized_ue.stage1.build --model_name Llama-2-7b-chat --dataset trivia_qa --num_samples 2000
 ```
 
-where
+One id-keyed record per prompt: greedy answer and accuracy, all-layer hidden states at the
+token-before-generation (TBG) and second-last-token (SLT) positions, N high-temperature samples,
+and a continuous `cluster_assignment_entropy` label. Resumable. See
+[`docs/methodology.md`](docs/methodology.md) for the extraction internals and
+[`data/README.md`](data/README.md) for regeneration and dataset artefacts.
 
-* `$MODEL` is one of: [`Llama-2-7b, Llama-2-13b, Llama-2-70b, Llama-2-7b-chat, Llama-2-13b-chat, Llama-2-70b-chat, falcon-7b, falcon-40b, falcon-7b-instruct, falcon-40b-instruct, Mistral-7B-v0.1, Mistral-7B-Instruct-v0.1, Phi-3-mini-128k-instruct`],
-* `$DATASET` is one of [`trivia_qa, squad, med_qa, bioasq, record, nq, svamp`],
-* and `$EXTRA_CFG` is empty for short-phrase generation and for sentence-length generation, `EXTRA_CFG=--num_few_shot=0 --model_max_new_tokens=100 --brief_prompt=chat --metric=llm_gpt-4 --entailment_model=gpt-3.5 --no-compute_accuracy_at_all_temps`.
+**Stage 2 — train the proxy** (proxy env):
 
-The results for any run can be obtained by passing their `wandb_id` to an evaluation notebook identical to the demonstration in `semantic_entropy_probes/train-latent-probe.ipynb`.
+```bash
+python -m amortized_ue.stage2.run \
+  --ood --ood_dataset squad --ood_num_samples 1000 --seeds 5 --reuse_selection \
+  --arms z,z_q,z_q_resp,q_only,q_resp_only \
+  --z_inputs TBG:22,SLT:15 --selected_k 4 --projector_hidden_dim 1024 \
+  --run_name reference
+
+python -m amortized_ue.stage2.run --eval --eval_datasets squad:1000   # reload, no retraining
+```
+
+**Diagnostics and baselines** (generation env, CPU):
+
+```bash
+python -m amortized_ue.baselines.ridge          --data_dir <stage1>   # ridge ceiling + layer picker
+python -m amortized_ue.baselines.label_noise_ceiling --data_dir <stage1>
+```
+
+**Experiments.** Each script under `experiments/` is runnable as a module and writes to
+`results/`, for example:
+
+```bash
+python -m experiments.rq2_supervision.supervision_signal_compare --data_dir <stage1>
+python -m experiments.cross_llm_transfer.procrustes_e26_decomposition
+python -m experiments.lolo_thesis.correctness_eval_e37 --data_dir <stage1>
+```
+
+## Attribution
+
+The `semantic_uncertainty/` module is adapted from
+[jlko/semantic_uncertainty](https://github.com/jlko/semantic_uncertainty) (Kuhn et al.; Farquhar
+et al., *Nature* 2024). The semantic-entropy-probe baseline follows Kossen et al.,
+*Semantic Entropy Probes* (arXiv:2406.15927). Changes to the vendored pipeline are limited to
+model-loading redirects (ungated mirrors) and are documented in `docs/development.md`.

@@ -14,7 +14,7 @@ from dataclasses import dataclass, asdict, field
 
 # Repo root = parent of this file's directory (amortized_ue/ -> repo).
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-_DEFAULT_OUTPUT = os.path.join(_REPO_ROOT, "amortized_ue", "data", "stage1")
+_DEFAULT_OUTPUT = os.getenv("AMORTIZED_UE_DATA", os.path.join(_REPO_ROOT, "data", "stage1"))
 
 
 @dataclass
@@ -54,7 +54,7 @@ class Stage1Config:
     strict_entailment: bool = True            # both-direction strict entailment for equivalence
 
     # --- output / storage -------------------------------------------------------
-    output_dir: str = _DEFAULT_OUTPUT         # single configurable output location
+    output_dir: str = _DEFAULT_OUTPUT         # $AMORTIZED_UE_DATA, else <repo>/data/stage1
     run_name: str | None = None               # subdir under output_dir; auto-derived if None
     overwrite: bool = False                   # re-generate prompts whose record file already exists
 

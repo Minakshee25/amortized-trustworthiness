@@ -42,7 +42,6 @@ def main(args):
     user = os.environ['USER']
     scratch_dir = os.getenv('SCRATCH_DIR', '.')
     wandb_dir = f'{scratch_dir}/{user}/uncertainty'
-    slurm_jobid = os.getenv('SLURM_JOB_ID', None)
     project = "semantic_uncertainty" if not args.debug else "semantic_uncertainty_debug"
     if args.assign_new_wandb_id:
         logging.info('Assign new wandb_id.')
@@ -52,7 +51,7 @@ def main(args):
             entity=args.entity,
             project=project,
             dir=wandb_dir,
-            notes=f'slurm_id: {slurm_jobid}, experiment_lot: {args.experiment_lot}',
+            notes=f'experiment_lot: {args.experiment_lot}',
             config={**old_run.config, **args.__dict__},
         )
 

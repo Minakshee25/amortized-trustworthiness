@@ -17,12 +17,14 @@ are untouched. Run in the amortized_stage2 env, pin a free GPU:
 """
 from __future__ import annotations
 
+import os
 import json
 import argparse
 import logging
 
 import numpy as np
 
+from amortized_ue.paths import RUNS_DIR
 from amortized_ue.stage2.config import Stage2Config
 from amortized_ue.stage2.data import Stage2Data
 from amortized_ue.stage2.train import Trainer
@@ -36,7 +38,7 @@ def main():
     p.add_argument("--sizes", default="500,1000,1440", help="comma-separated train sizes")
     p.add_argument("--seeds", type=int, default=3, help="trial seeds per size")
     p.add_argument("--arm", default="z")
-    p.add_argument("--out", default="amortized_ue/stage2/runs/proxy_learning_curve.json")
+    p.add_argument("--out", default=os.path.join(RUNS_DIR, "proxy_learning_curve.json"))
     a = p.parse_args()
 
     z_inputs = tuple(s.strip() for s in a.z_inputs.split(","))

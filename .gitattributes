@@ -1,0 +1,3 @@
+*.pt binary
+*.joblib binary
+*.pkl binary

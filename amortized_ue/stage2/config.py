@@ -59,9 +59,9 @@ class Stage2Config:
     sweep_subsample_seed: int = 42             # seed for that subsample (train split only)
 
     # --- projector (hidden vector -> soft tokens) -------------------------------
-    #   LayerNorm(H_in) -> Linear(H_in, hidden) -> GELU -> Dropout
-    #   -> Linear(hidden, k*d_model) -> reshape [B,k,d_model]
-    #   -> per-token unit-normalise -> * learnable scalar (init = emb_norm)
+    # LayerNorm(H_in) -> Linear(H_in, hidden) -> GELU -> Dropout
+    # -> Linear(hidden, k*d_model) -> reshape [B,k,d_model]
+    # -> per-token unit-normalise -> * learnable scalar (init = emb_norm)
     k_soft_tokens: int = 4                      # configurable; ablate {1,4,8}
     projector_type: str = "mlp"                 # "mlp" (bottleneck) | "linear"
     projector_hidden_dim: int = 256             # bottleneck width

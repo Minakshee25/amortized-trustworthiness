@@ -24,13 +24,12 @@ UNC_MEAS = 'uncertainty_measures.pkl'
 def init_wandb(wandb_runid, assign_new_wandb_id, experiment_lot, entity):
     '''Initialize wandb session.'''
     user = os.environ['USER']
-    slurm_jobid = os.getenv('SLURM_JOB_ID')
     scratch_dir = os.getenv('SCRATCH_DIR', '.')
     kwargs = dict(
         entity=entity,
         project='semantic_uncertainty',
         dir=f'{scratch_dir}/{user}/uncertainty',
-        notes=f'slurm_id: {slurm_jobid}, experiment_lot: {experiment_lot}',
+        notes=f'experiment_lot: {experiment_lot}',
     )
     if not assign_new_wandb_id:
         # Restore wandb session.

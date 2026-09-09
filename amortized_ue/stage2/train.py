@@ -31,12 +31,12 @@ from amortized_ue.stage2.model import ProxyModel
 # ------------------------------- arms -----------------------------------------
 # Five arms — a 2x2 of {no text, question, question+response} x {with z, without z}:
 #
-#   arm          z?    text                  sequence
-#   z            yes   --                    [k soft][REG]
-#   z_q          yes   Question:             [k soft][text][REG]
-#   z_q_resp     yes   Question: + Answer:   [k soft][text][REG]
-#   q_only       NO    Question:             [text][REG]
-#   q_resp_only  NO    Question: + Answer:   [text][REG]
+# arm          z?    text                  sequence
+# z            yes   --                    [k soft][REG]
+# z_q          yes   Question:             [k soft][text][REG]
+# z_q_resp     yes   Question: + Answer:   [k soft][text][REG]
+# q_only       NO    Question:             [text][REG]
+# q_resp_only  NO    Question: + Answer:   [text][REG]
 #
 # Why the TEXT-ONLY arms exist: every z-arm needs a forward pass of the TARGET LLM to produce z
 # — and if you are running that pass anyway, a linear probe on the hidden states (SEP / our ridge

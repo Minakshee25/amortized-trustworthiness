@@ -6,7 +6,7 @@ The split reproduces the Stage-1 diagnostic exactly (test 0.1, then val 0.2 of t
 remainder, seed 42, over the id-sorted order) so the held-out test set matches.
 
 Hidden states are referred to by physical position only:
-  TBG = last input token before generation; SLT = second-last generated token.
+TBG = last input token before generation; SLT = second-last generated token.
 Both are stored as [L+1, 1, H] (L+1 = 33 = embedding + 32 layers). z for a given
 (position, layer) is hidden[position][layer] squeezed to [H].
 """
@@ -19,7 +19,7 @@ import torch
 from sklearn.model_selection import train_test_split
 
 from amortized_ue.config import Stage1Config
-from amortized_ue.loaders import load_records
+from amortized_ue.stage1.loaders import load_records
 from amortized_ue.stage2.config import Stage2Config
 
 
